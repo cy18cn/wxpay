@@ -27,3 +27,7 @@ type UnifiedOrderRequest struct {
 	LimitPay       string `xml:"limit_pay,omitempty"`
 	Receipt        string `xml:"receipt,omitempty"`
 }
+
+func UnifiedOrder(request *UnifiedOrderRequest) (*UnifiedOrderResp, error) {
+	return nil, nil
+}
