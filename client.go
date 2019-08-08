@@ -95,14 +95,20 @@ func newTlsClient(mchId, certPath string, isProd bool) (client *Client, err erro
 	return client, nil
 }
 
-func (self *Client) DoRequest(method, api string, wxpayReq WxpayRequest, reply interface{}) error {
+func (self *Client) DoRequest(method, api string, wxpayReq WxpayRequest, reply interface{}) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			fmt.Println("recover from ", r)
+			if e, ok := r.(error); ok {
+				err = e
+				return
+			}
+
+			if str, ok := r.(string); ok {
+				err = errors.New(str)
+			}
 		}
 	}()
 
-	var err error
 	var payload string
 	payload, err = wxpayReq.Payload()
 	if err != nil {

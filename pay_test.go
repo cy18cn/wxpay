@@ -24,6 +24,7 @@ func TestUnifiedOrderRequest_Payload(t *testing.T) {
 		SpbillCreateIP: "202.105.107.18",
 		TotalFee:       101,
 		OutTradeNo:     "test-111111125",
+		Attach:         "{\"content\": \"test\"}",
 	}
 
 	str, err := req.Payload()
