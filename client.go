@@ -3,7 +3,6 @@ package wxpay
 import (
 	"bytes"
 	"crypto/tls"
-	"encoding/xml"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -27,9 +26,9 @@ const (
 )
 
 var (
-	lock      = &sync.Mutex{}
-	client    *Client
-	tlsClient *Client
+	lock       = &sync.Mutex{}
+	client     *Client
+	tlsClients map[string]*Client
 )
 
 type Client struct {
@@ -95,7 +94,7 @@ func newTlsClient(mchId, certPath string, isProd bool) (client *Client, err erro
 	return client, nil
 }
 
-func (self *Client) DoRequest(method, api string, wxpayReq WxpayRequest, reply interface{}) (err error) {
+func (self *Client) DoRequest(method, api string, wxpayReq WxpayRequest) (reply []byte, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			if e, ok := r.(error); ok {
@@ -112,13 +111,13 @@ func (self *Client) DoRequest(method, api string, wxpayReq WxpayRequest, reply i
 	var payload string
 	payload, err = wxpayReq.Payload()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	var request *http.Request
 	request, err = http.NewRequest(method, self.apiUrl(api), bytes.NewBufferString(payload))
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	request.Header.Set("Content-Type", "application/xml;charset=utf-8")
@@ -127,7 +126,7 @@ func (self *Client) DoRequest(method, api string, wxpayReq WxpayRequest, reply i
 	var resp *http.Response
 	resp, err = self.HttpClient.Do(request)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	defer resp.Body.Close()
@@ -135,25 +134,34 @@ func (self *Client) DoRequest(method, api string, wxpayReq WxpayRequest, reply i
 	var data []byte
 	data, err = ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return xml.Unmarshal(data, reply)
+	reply = data
+
+	return
 }
 
 func (self *Client) apiUrl(api string) string {
 	return fmt.Sprintf("%s%s", self.ApiDomain, api)
 }
 
-func InitClient(isProd bool, mchId, certPath string) (client *Client, err error) {
+func InitClient(isProd bool, mchId, certPath string) error {
 	lock.Lock()
 	defer lock.Unlock()
 
+	var err error
 	if len(certPath) == 0 {
 		client = newClient(isProd)
-		return
+		return nil
 	}
 
-	client, err = newTlsClient(mchId, certPath, isProd)
-	return
+	var tlsClient *Client
+	tlsClient, err = newTlsClient(mchId, certPath, isProd)
+	if err != nil {
+		return err
+	}
+
+	tlsClients[mchId] = tlsClient
+	return nil
 }

@@ -17,6 +17,26 @@ type UnifiedOrderResp struct {
 	PrepayId  string `xml:"prepay_id"`  // 微信生成的预支付回话标识，用于后续接口调用中使用，该值有效期为2小时
 }
 
+func (self *UnifiedOrderResp) ToUrlValues() url.Values {
+	ua := url.Values{}
+	ua.Set("appid", self.AppId)
+	ua.Set("mch_id", self.MchId)
+	ua.Set("nonce_str", self.NonceStr)
+
+	ua.Set("return_code", self.ReturnCode)
+	ua.Set("return_msg", self.ReturnMsg)
+	ua.Set("result_code", self.ResultCode)
+	ua.Set("err_code", self.ErrCode)
+	ua.Set("err_code_des", self.ErrCodeDes)
+
+	ua.Set("device_info", self.DeviceInfo)
+
+	ua.Set("trade_type", self.TradeType)
+	ua.Set("prepay_id", self.PrepayId)
+
+	return ua
+}
+
 // UnifiedOrderRequest 微信统一下单
 // https://pay.weixin.qq.com/wiki/doc/api/app/app.php?chapter=9_1
 type UnifiedOrderRequest struct {
@@ -79,11 +99,18 @@ func (self *UnifiedOrderRequest) ToUrlValues() url.Values {
 }
 
 func UnifiedOrder(request *UnifiedOrderRequest, mchKey string) (*UnifiedOrderResp, error) {
-	request.Sign = Sign(request.ToUrlValues(), mchKey)
+	if request.SignType == SIGN_MD5 {
+		request.Sign = SignMD5(request.ToUrlValues(), mchKey)
+	} else {
+		request.Sign = SignHmacSha256(request.ToUrlValues(), mchKey)
+	}
 
 	var err error
 	if client == nil {
-		client, err = InitClient(viper.GetBool("isProd"), "", "")
+		err = InitClient(viper.GetBool("isProd"), "", "")
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// var reply *UnifiedOrderResp 此处reply为nil
@@ -94,12 +121,21 @@ func UnifiedOrder(request *UnifiedOrderRequest, mchKey string) (*UnifiedOrderRes
 	// reply = &UnifiedOrderResp{}
 	//client.DoRequest(http.MethodPost, "/pay/unifiedorder", request, reply)
 
-	var reply UnifiedOrderResp
-	client.DoRequest(http.MethodPost, "/pay/unifiedorder", request, &reply)
-
+	var reply []byte
+	reply, err = client.DoRequest(http.MethodPost, "/pay/unifiedorder", request)
 	if err != nil {
 		return nil, err
 	}
 
-	return &reply, nil
+	var resp UnifiedOrderResp
+	xml.Unmarshal(reply, &resp)
+	if err != nil {
+		return nil, err
+	}
+
+	if !VerifySign(resp.ToUrlValues(), mchKey, resp.Sign, request.SignType) {
+		return nil, errors.New("Result签名错误")
+	}
+
+	return &resp, nil
 }
