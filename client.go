@@ -6,8 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"sync"
+	"time"
 )
 
 const (
@@ -36,13 +38,25 @@ type Client struct {
 	IsProduction bool
 	HttpClient   *http.Client
 	CertPath     string
+	Timeout      time.Duration
 }
 
-func newClient(isProd bool) *Client {
+func newClient(timeout time.Duration, isProd bool) *Client {
 	client := &Client{}
 
 	client.IsProduction = isProd
-	client.HttpClient = http.DefaultClient
+	client.HttpClient = &http.Client{
+		Transport: &http.Transport{
+			DialContext: (&net.Dialer{
+				Timeout:   30 * time.Second,
+				KeepAlive: 30 * time.Second,
+			}).DialContext,
+			MaxConnsPerHost: 100,
+			MaxIdleConns:    100,
+			IdleConnTimeout: 30 * time.Second,
+		},
+		Timeout: timeout,
+	}
 
 	if isProd {
 		client.ApiDomain = SANDBOX_URL
@@ -53,7 +67,7 @@ func newClient(isProd bool) *Client {
 	return client
 }
 
-func newTlsClient(mchId, certPath string, isProd bool) (client *Client, err error) {
+func newTlsClient(mchId, certPath string, timeout time.Duration, isProd bool) (client *Client, err error) {
 	if len(certPath) == 0 {
 		return client, errors.New(NOT_FOUND_CERT_FILE)
 	}
@@ -77,6 +91,13 @@ func newTlsClient(mchId, certPath string, isProd bool) (client *Client, err erro
 	transport := &http.Transport{
 		TLSClientConfig:    config,
 		DisableCompression: true,
+		DialContext: (&net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}).DialContext,
+		MaxConnsPerHost: 100,
+		MaxIdleConns:    100,
+		IdleConnTimeout: 30 * time.Second,
 	}
 
 	client = &Client{}
@@ -89,6 +110,7 @@ func newTlsClient(mchId, certPath string, isProd bool) (client *Client, err erro
 	}
 	client.HttpClient = &http.Client{
 		Transport: transport,
+		Timeout:   timeout,
 	}
 
 	return client, nil
@@ -146,18 +168,18 @@ func (self *Client) apiUrl(api string) string {
 	return fmt.Sprintf("%s%s", self.ApiDomain, api)
 }
 
-func InitClient(isProd bool, mchId, certPath string) error {
+func InitClient(mchId, certPath string, timeout time.Duration, isProd bool) error {
 	lock.Lock()
 	defer lock.Unlock()
 
 	var err error
 	if len(certPath) == 0 {
-		client = newClient(isProd)
+		client = newClient(timeout, isProd)
 		return nil
 	}
 
 	var tlsClient *Client
-	tlsClient, err = newTlsClient(mchId, certPath, isProd)
+	tlsClient, err = newTlsClient(mchId, certPath, timeout, isProd)
 	if err != nil {
 		return err
 	}

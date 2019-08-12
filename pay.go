@@ -107,7 +107,7 @@ func UnifiedOrder(request *UnifiedOrderRequest, mchKey string) (*UnifiedOrderRes
 
 	var err error
 	if client == nil {
-		err = InitClient(viper.GetBool("isProd"), "", "")
+		err = InitClient("", "", viper.GetDuration("timeout"), viper.GetBool("isProd"))
 		if err != nil {
 			return nil, err
 		}
