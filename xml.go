@@ -55,5 +55,5 @@ func UnmarshalToMap(b []byte) map[string]interface{} {
 
 	}
 
-	return s.Pop().(map[string]interface{})["xml"].(map[string]interface{})
+	return s.Pop().(map[string]interface{})
 }
