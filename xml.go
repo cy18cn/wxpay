@@ -37,19 +37,33 @@ func UnmarshalToMap(b []byte) map[string]interface{} {
 					break
 				}
 
-				// handle pushed map
-				if node, ok := p.(map[string]interface{}); ok {
+				switch p.(type) {
+				case map[string]interface{}:
+					// handle pushed map
+					node := p.(map[string]interface{})
 					for k, v := range node {
 						entry[k] = v
 					}
 					if val == nil {
 						val = entry
 					}
-					continue
+				default:
+					// handle xml char data
+					val = p
 				}
-
-				// handle xml char data
-				val = p
+				// handle pushed map
+				//if node, ok := p.(map[string]interface{}); ok {
+				//	for k, v := range node {
+				//		entry[k] = v
+				//	}
+				//	if val == nil {
+				//		val = entry
+				//	}
+				//	continue
+				//}
+				//
+				//// handle xml char data
+				//val = p
 			}
 		}
 
