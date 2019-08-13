@@ -2,6 +2,7 @@ package wxpay
 
 import (
 	"encoding/xml"
+	"errors"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -25,8 +26,6 @@ type PayNotification struct {
 	OutTradeNo    string `xml:"out_trade_no"`       // required, 商户订单号
 	Attach        string `xml:"attach"`             // optional, 商家数据包，原样返回
 	TimeEnd       string `xml:"time_end"`           // required, 支付完成时间
-	CouponId0     string `xml:"coupon_id_0"`        // optional, 第一张优惠券id
-	CouponFee0    int32  `xml:"coupon_fee_0"`       // optional, 第一张优惠券优惠金额
 }
 
 func (self *PayNotification) ToUrlValues() url.Values {
@@ -59,6 +58,24 @@ func (self *PayNotification) ToUrlValues() url.Values {
 	return ua
 }
 
+type WxpayNotification map[string]interface{}
+
+func (self WxpayNotification) Get(key string) interface{} {
+	return self[key]
+}
+
+func (self WxpayNotification) GetInt(key string) (int, error) {
+	return strconv.Atoi(self.Get(key).(string))
+}
+
+func (self WxpayNotification) GetInt64(key string) (int64, error) {
+	return strconv.ParseInt(self.Get(key).(string), 10, 64)
+}
+
+func (self WxpayNotification) GetFloat64(key string) (float64, error) {
+	return strconv.ParseFloat(self.Get(key).(string), 64)
+}
+
 type NotifyResp struct {
 	XMLName    xml.Name `xml:"xml"`
 	ReturnCode string   `xml:"return_code"`
@@ -81,17 +98,18 @@ func AckNotification(w http.ResponseWriter) error {
 	return nil
 }
 
-func GetNotification(req *http.Request) (*PayNotification, error) {
+func GetNotification(req *http.Request, mchKey string) (WxpayNotification, error) {
 	body, err := ioutil.ReadAll(req.Body)
 	if err != nil {
 		return nil, err
 	}
 
-	var nofi *PayNotification
-	err = xml.Unmarshal(body, nofi)
-	if err != nil {
-		return nil, err
+	m := UnmarshalToMap(body)
+	noti := m["xml"].(map[string]interface{})
+
+	if !VerifyResp(noti, mchKey, noti["sign"].(string), SIGN_HMAC_SHA256) {
+		return nil, errors.New("签名错误")
 	}
 
-	return nofi, nil
+	return noti, nil
 }

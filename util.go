@@ -93,6 +93,15 @@ func VerifySign(ua url.Values, key, sign, signType string) bool {
 	}
 }
 
+func VerifyResp(resp map[string]interface{}, key, sign, signType string) bool {
+	ua := url.Values{}
+	for k, v := range resp {
+		ua.Set(k, v.(string))
+	}
+
+	return VerifySign(ua, key, sign, signType)
+}
+
 func NonceStr() string {
 	chars := "abcdefghijklmnopqrstuvwxyz0123456789"
 	rdn := rand.New(rand.NewSource(time.Now().UnixNano()))

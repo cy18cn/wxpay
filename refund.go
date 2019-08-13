@@ -3,10 +3,12 @@ package wxpay
 import (
 	"encoding/xml"
 	"errors"
-	"github.com/spf13/viper"
 	"net/http"
 	"net/url"
 	"strconv"
+
+	"github.com/spf13/cast"
+	"github.com/spf13/viper"
 )
 
 type RefundResp struct {
@@ -27,6 +29,60 @@ type RefundResp struct {
 	CashRefundFee       int32  `xml:"cash_refund_fee,omitempty"`       // 现金退款金额
 	CouponRefundFee     int32  `xml:"coupon_refund_fee,omitempty"`     // 代金券退款金额<=退款金额，退款金额-代金券或立减优惠退款金额为现金
 	CouponRefundCount   int32  `xml:"coupon_refund_count,omitempty"`   // 退款代金券使用数量
+}
+
+func NewResp(m map[string]string) *RefundResp {
+	var (
+		refundFee           int
+		settlementRefundFee int
+		totalFee            int
+		settlementTotalFee  int
+		cashFee             int
+		cashRefundFee       int
+		couponRefundFee     int
+		couponRefundCount   int
+	)
+
+	refundFee, _ = strconv.Atoi(m["refund_fee"])
+	settlementRefundFee, _ = strconv.Atoi(m["settlement_refund_fee"])
+	totalFee, _ = strconv.Atoi(m["total_fee"])
+	settlementTotalFee, _ = strconv.Atoi(m["settlement_total_fee"])
+	cashFee, _ = strconv.Atoi(m["cash_fee"])
+	cashRefundFee, _ = strconv.Atoi(m["cash_refund_fee"])
+	couponRefundFee, _ = strconv.Atoi(m["coupon_refund_fee"])
+	couponRefundCount, _ = strconv.Atoi(m["coupon_refund_count"])
+
+	return &RefundResp{
+		Response: Response{
+			ReturnCode: m["return_code"],
+			ReturnMsg:  m["return_msg"],
+			AppId:      m["appid"],
+			MchId:      m["mch_id"],
+			DeviceInfo: m["device_info"],
+			NonceStr:   m["nonce_str"],
+			Sign:       m["sign"],
+			ResultCode: m["result_code"],
+		},
+		Error: Error{
+			ErrCode:    m["err_code"],
+			ErrCodeDes: m["err_code_des"],
+		},
+		TradeType:           m["trade_type"],
+		TransactionId:       m["transaction_id"],
+		OutTradeNo:          m["out_trade_no"],
+		OutRefundNo:         m["out_refund_no"],
+		RefundId:            m["refund_id"],
+		RefundFee:           int32(refundFee),
+		SettlementRefundFee: int32(settlementRefundFee),
+		TotalFee:            int32(totalFee),
+		SettlementTotalFee:  int32(settlementTotalFee),
+		FeeType:             m["fee_type"],
+		CashFee:             int32(cashFee),
+		CashFeeType:         m["cash_fee_type"],
+		CashRefundFee:       int32(cashRefundFee),
+		CouponRefundFee:     int32(couponRefundFee),
+		CouponRefundCount:   int32(couponRefundCount),
+	}
 }
 
 func (self *RefundResp) ToUrlValues() url.Values {
@@ -135,18 +191,10 @@ func Refund(req *RefundRequest, mchKey, mchId string) (*RefundResp, error) {
 		return nil, err
 	}
 
-	var resp *RefundResp
-	err = xml.Unmarshal(reply, resp)
-	if err != nil {
-		return nil, err
-	}
-
-	if !VerifySign(resp.ToUrlValues(), mchKey, resp.Sign, req.SignType) {
+	respMap := UnmarshalToMap(reply)
+	if !VerifyResp(respMap["xml"].(map[string]interface{}), mchKey, respMap["sign"].(string), req.SignType) {
 		return nil, errors.New("签名错误")
 	}
 
-	return resp, nil
-}
-
-type RefundCoupon struct {
+	return NewResp(respMap["xml"].(map[string]string)), nil
 }
