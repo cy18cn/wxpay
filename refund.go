@@ -7,7 +7,6 @@ import (
 	"net/url"
 	"strconv"
 
-	"github.com/spf13/cast"
 	"github.com/spf13/viper"
 )
 
