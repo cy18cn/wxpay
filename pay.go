@@ -57,6 +57,9 @@ type UnifiedOrderRequest struct {
 	TradeType      string `xml:"trade_type"`                 // 必填：是，trade_type：支付类型（APP,JSAPI,NATIVE）
 	LimitPay       string `xml:"limit_pay,omitempty"`        // 必填：否，limit_pay：no_credit--指定不能使用信用卡支付
 	Receipt        string `xml:"receipt,omitempty"`          // 必填：否，receipt：Y，传入Y时，支付成功消息和支付详情页将出现开票入口
+	ProductId      string `xml:"product_id,omitempty"`       // 必填：否，NATIVE 必填
+	OpenId         string `xml:"open_id,omitempty"`          // 必填：否， JSAPI必填
+	SceneInfo      string `xml:"scene_info,omitempty"`       // 必填： 否，H5必填
 }
 
 func (self *UnifiedOrderRequest) Payload() (string, error) {
@@ -94,6 +97,9 @@ func (self *UnifiedOrderRequest) ToUrlValues() url.Values {
 	ua.Set("trade_type", self.TradeType)
 	ua.Set("limit_pay", self.LimitPay)
 	ua.Set("receipt", self.Receipt)
+	ua.Set("product_id", self.ProductId)
+	ua.Set("open_id", self.OpenId)
+	ua.Set("scene_info", self.SceneInfo)
 
 	return ua
 }
